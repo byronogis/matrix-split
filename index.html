@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>matrix-split</title>
+
+  <!-- Vue -->
+  <script type="importmap">
+    {
+      "imports": {
+        "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js"
+      }
+    }
+  </script>
+  <!-- /Vue -->
+  <!-- UnoCSS -->
+  <script>
+    window.__unocss = {/* options */}
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@unocss/runtime"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@unocss/reset/tailwind.min.css">
+  <!-- /UnoCSS -->
+</head>
+<body>
+  <div id="app" class="mt-100px w-800px m-auto">
+    <div class="h-600px border-2">
+      <Matrix ref="matrixRef" :data="data" :support="matrixSupport"></Matrix>
+    </div>
+
+    <div class="flex flex-row gap-x-4 mt-4 px-16">
+      <span>Split: </span>
+      <i class="flex-1"></i>
+      <ul class="flex flex-row flex-wrap gap-x-4 gap-y-1">
+        <li 
+          v-for="matrix,index in matrixSupport" :key="index"
+          class="[&>.matrix-item-del]:hover:block flex flex-row gap-x-2"
+        >
+          <button
+            class="px-2 border-2 rounded-2" 
+            :class="[selectedMatrixItem || 'cursor-not-allowed']" 
+            @click="handleSplitBtnClick(matrix)"
+          >{{Array.isArray(matrix) ? `${matrix[0]}*${matrix[1]}` : `${matrix}*${matrix}`}}</button>
+          <button
+            class="matrix-item-del hidden color-red cursor-pointer"
+            @click="matrixSupport.splice(index, 1)"
+          >x</button>
+        </li>
+      </ul>
+    </div>
+
+    <div class="flex flex-row gap-x-4 mt-4 px-16">
+      <span>Custom: </span>
+      <i class="flex-1"></i>
+      <div>
+        <span>x:</span>
+        <input type="number" min="1" class="border-1" v-model="customMatrix[1]" />
+      </div>
+      <div>
+        <span>y:</span>
+        <input type="number" min="1" class="border-1" v-model="customMatrix[0]" />
+      </div>
+      <button 
+        class="px-2 border-2 rounded-2"
+        :class="[selectedMatrixItem || 'cursor-not-allowed']"
+        @click="handleSplitBtnClick([...customMatrix])"
+      >Split</button>
+      <button 
+        class="px-2 border-2 rounded-2"
+        @click="matrixSupport.push([...customMatrix])"
+      >Add</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createApp, ref, computed } from 'vue'
+    import Matrix from './Matrix.js'
+
+    createApp({
+      components: {
+        Matrix,
+      },
+      setup() {
+        const data = ref({
+          // root
+          id: 0,
+          matrix: 1,
+          isScreen: false,
+          isWindow: false,
+        })
+        const dataIdIndex = computed(() => {
+          const result = []
+          const findId = (data) => {
+            if (data.children?.length) {
+              for (const child of data.children) {
+                findId(child)
+              }
+              result.push(`${data.children.reduce((acc, cur) => `${acc}_${cur.id}`, '')}`)
+            } else {
+              result.push(`${data.id}`)
+            }
+          }
+          findId(data.value)
+          return [...new Set(result)]
+        })
+
+        const getUnusedId = (usedIds, validId = 1) => {
+          while (usedIds.includes(validId)) {
+            validId++
+          }
+          console.log(validId)
+          return validId
+        }
+
+        const matrixSupport = ref([2, 3, 4, [3, 2], [4, 3], [5, 4]])
+
+        const customMatrix = ref([3,3])
+
+        const matrixRef = ref(null)
+        const selectedMatrixItem = computed(() => matrixRef.value?.selectedItem)
+
+        const handleSplitBtnClick = (matrix) => {
+          if (!selectedMatrixItem.value) return
+
+          const nums = Array.isArray(matrix) ? matrix[0]*matrix[1] : matrix*matrix
+          
+          const findItem = (data, id) => {
+            if (data.id === id) return data
+            if (data.children?.length) {
+              for (const child of data.children) {
+                const result = findItem(child, id)
+                if (result) return result
+              }
+            }
+          }
+
+          const item = findItem(data.value, selectedMatrixItem.value.id)
+
+          item.id = Date.now()
+          
+          item.children = Array(nums).fill(0).reduce((acc, cur) => {
+            const usedIds = dataIdIndex.value
+              .map(i => Number(i))
+              .filter(i => !Number.isNaN(i))
+            
+            const id = getUnusedId([...usedIds, ...acc.map(i => i.id)])
+            return [...acc, { 
+              id,
+              isWindow: true,
+            }]
+          }, [])
+
+          item.id = item.children.reduce((acc, cur) => `${acc}_${cur.id}`, '')
+          item.matrix = matrix
+
+          matrixRef.value.selectedItem = null
+        }
+        
+        return {
+          data,
+          dataIdIndex,
+          matrixSupport,
+          matrixRef,
+          selectedMatrixItem,
+          handleSplitBtnClick,
+          customMatrix,
+        }
+      }
+    }).mount('#app')
+  </script>
+</body>
+</html>
